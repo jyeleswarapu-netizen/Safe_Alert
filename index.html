@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SafeAlert</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+body{background:#070707;color:#fff;min-height:100vh;overflow-x:hidden}
+.page{display:none;padding:20px;padding-bottom:110px}
+.page.active{display:block}
+.title{font-size:30px;font-weight:700;margin-bottom:10px}
+.sub{color:#999;margin-bottom:20px;line-height:1.6}
+.location{padding:18px;background:#111;border-radius:22px;text-align:center;color:#ff5555;line-height:1.8;margin-bottom:14px}
+.primary-btn{width:100%;padding:15px;border:none;border-radius:16px;background:#1976ff;color:#fff;font-size:16px;margin-top:12px}
+.danger-btn{background:#b00000}
+.green-btn{background:#16a34a}
+.live-box{display:flex;flex-direction:column;align-items:center;margin-top:18px;margin-bottom:22px}
+.live-icon{width:90px;height:90px;border-radius:50%;background:#111;display:flex;justify-content:center;align-items:center;font-size:42px}
+.live-title{margin-top:14px;font-size:18px;font-weight:bold;color:#1976ff}
+.live-value{margin-top:16px;width:100%;background:#151515;padding:20px;border-radius:24px;text-align:center;font-size:18px}
+.sos-wrap{height:40vh;display:flex;justify-content:center;align-items:center}
+.sos-btn{width:240px;height:240px;border:none;border-radius:50%;background:#b00000;color:#fff;font-size:60px;font-weight:bold;box-shadow:0 0 40px red,0 0 90px rgba(255,0,0,.45)}
+.stats{display:flex;gap:14px;margin-top:20px}
+.stat-card{flex:1;background:#111;border-radius:24px;padding:28px;text-align:center}
+.stat-number{font-size:54px;font-weight:bold}
+.stat-text{color:#888;margin-top:8px}
+.card{background:#111;padding:18px;border-radius:22px;margin-top:16px}
+input{width:100%;padding:15px;margin-top:12px;border:none;border-radius:14px;background:#1d1d1d;color:#fff}
+.contact{background:#181818;padding:16px;margin-top:12px;border-radius:16px}
+.profile-box{background:#111;padding:22px;border-radius:24px;margin-top:16px}
+.profile-info{line-height:2;margin-top:16px}
+.history{background:#111;padding:16px;border-radius:16px;margin-top:12px}
+.bottom{position:fixed;left:0;right:0;bottom:0;height:82px;background:#080808;display:flex;justify-content:space-around;align-items:center;border-top:1px solid #222}
+.item{display:flex;flex-direction:column;align-items:center;gap:4px;color:#777;font-size:12px}
+.item i{font-size:22px}
+.selected{color:#1976ff}
+
+/* LIVE TRACKING */
+.track-status{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;background:#111;border-radius:18px;font-weight:bold;color:#888}
+.dot{width:12px;height:12px;border-radius:50%;background:#555}
+.track-on{color:#22c55e}
+.track-on .dot{background:#22c55e;animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.7)}100%{box-shadow:0 0 0 14px rgba(34,197,94,0)}}
+.map-wrap{margin-top:14px;border-radius:22px;overflow:hidden;background:#111;height:260px}
+.map-wrap iframe{width:100%;height:100%;border:0}
+.map-empty{height:100%;display:flex;align-items:center;justify-content:center;color:#666;text-align:center;padding:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.tile{background:#111;border-radius:18px;padding:16px;text-align:center}
+.tile b{display:block;font-size:22px;margin-bottom:4px}
+.tile span{color:#888;font-size:13px}
+.note{color:#777;font-size:13px;line-height:1.6;margin-top:14px}
+</style>
+</head>
+<body>
+
+<section id="sos" class="page active">
+<div class="title">SafeAlert</div>
+<div class="sub">Your emergency safety companion</div>
+<div id="location" class="location">Waiting for location...</div>
+<button class="primary-btn" onclick="getLocation()">Refresh Location</button>
+<div class="live-box">
+<div class="live-icon">📍</div>
+<div class="live-title">LIVE LOCATION</div>
+<div id="liveLocation" class="live-value">Waiting...</div>
+</div>
+<div class="sos-wrap"><button class="sos-btn" onclick="sendSOS()">SOS</button></div>
+<div class="stats">
+<div class="stat-card"><div id="contactCount" class="stat-number">0</div><div class="stat-text">Emergency Contacts</div></div>
+<div class="stat-card"><div id="alertCount" class="stat-number">0</div><div class="stat-text">Past Alerts</div></div>
+</div>
+</section>
+
+<!-- CONTACTS -->
+<section id="contacts" class="page">
+<div class="title">Emergency Contacts</div>
+<div class="card">
+<input id="name" type="text" placeholder="Contact Name">
+<input id="phone" type="tel" placeholder="Phone Number">
+<button class="primary-btn" onclick="saveContact()">Save Contact</button>
+</div>
+<div id="contactList"></div>
+</section>
+
+<!-- TRACK -->
+<section id="track" class="page">
+<div class="title">Live Tracking</div>
+<div class="sub">Follow your movement in real time and share it with your contacts</div>
+<div id="trackStatus" class="track-status"><span class="dot"></span><span id="trackStatusText">Tracking off</span></div>
+<div id="mapWrap" class="map-wrap"><div class="map-empty">Start tracking to see your live map</div></div>
+<div class="grid">
+<div class="tile"><b id="tSpeed">0</b><span>Speed (km/h)</span></div>
+<div class="tile"><b id="tDist">0</b><span>Distance (km)</span></div>
+<div class="tile"><b id="tTime">00:00</b><span>Duration</span></div>
+<div class="tile"><b id="tAcc">-</b><span>Accuracy (m)</span></div>
+</div>
+<div id="tUpdated" class="note" style="text-align:center">Last update: -</div>
+<button id="trackBtn" class="primary-btn green-btn" onclick="toggleTracking()">Start Live Tracking</button>
+<button class="primary-btn" onclick="shareUpdate()">Share Current Location</button>
+<div class="note">Your location is sent to contacts by SMS as a map link each time you tap "Share Current Location". Keep this page open while tracking; the screen is kept awake where your browser supports it. Tracking also starts automatically when you send an SOS.</div>
+</section>
+
+<!-- SAFETY -->
+<section id="safety" class="page">
+<div class="title">Emergency Calls</div>
+<div class="sub">Quick emergency access</div>
+<div class="card">
+<button class="primary-btn" onclick="callNumber('100')">👮 Police — 100</button>
+<button class="primary-btn" onclick="callNumber('1098')">🧒 Child Helpline — 1098</button>
+<button class="primary-btn" onclick="callNumber('1091')">👩 Women Safety — 1091</button>
+<button class="primary-btn" onclick="callNumber('112')">🚨 National Emergency — 112</button>
+<button class="primary-btn" onclick="callNumber('108')">🚑 Ambulance — 108</button>
+<button class="primary-btn" onclick="callNumber('101')">🔥 Fire Brigade — 101</button>
+</div>
+<h3 style="margin-top:18px">Saved Contacts</h3>
+<div id="safetyContacts"></div>
+</section>
+
+<!-- HISTORY -->
+<section id="history" class="page">
+<div class="title">SOS History</div>
+<div class="sub">Emergency records</div>
+<div id="historyList"></div>
+</section>
+
+<!-- PROFILE -->
+<section id="profile" class="page">
+<div class="title">Profile</div>
+<div class="sub">Your details for SOS</div>
+<div class="profile-box">
+<div class="profile-title">Your Details</div>
+<div class="profile-sub">This information may be shared during SOS</div>
+<input id="profileName" placeholder="Full Name">
+<input id="profilePhone" placeholder="Phone Number">
+<input id="profileEmail" type="email" placeholder="Email (Optional)">
+<button class="primary-btn" onclick="saveProfile()">Save Profile</button>
+<div id="profileInfo" class="profile-info">No profile saved</div>
+</div>
+</section>
+
+<!-- NAV -->
+<nav class="bottom">
+<div class="item selected" onclick="tab('sos',this)"><i class="fa-solid fa-shield"></i><span>SOS</span></div>
+<div class="item" onclick="tab('contacts',this)"><i class="fa-solid fa-users"></i><span>Contacts</span></div>
+<div class="item" onclick="tab('track',this)"><i class="fa-solid fa-location-crosshairs"></i><span>Track</span></div>
+<div class="item" onclick="tab('safety',this)"><i class="fa-solid fa-heart"></i><span>Safety</span></div>
+<div class="item" onclick="tab('history',this)"><i class="fa-solid fa-clock"></i><span>History</span></div>
+<div class="item" onclick="tab('profile',this)"><i class="fa-solid fa-user"></i><span>Profile</span></div>
+</nav>
+
+<script>
+let lat=null,lng=null,lastShake=0;
+
+/* STORAGE */
+function read(key,fallback=[]){
+try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}
+}
+function write(key,value){
+try{localStorage.setItem(key,JSON.stringify(value))}catch{}
+}
+
+/* STATS */
+function updateStats(){
+const c=document.getElementById("contactCount"),a=document.getElementById("alertCount");
+if(c)c.innerHTML=read("contacts",[]).length;
+if(a)a.innerHTML=read("history",[]).length;
+}
+
+/* LOCATION (single fix) */
+function paintLocation(pos){
+lat=pos.coords.latitude;lng=pos.coords.longitude;
+document.getElementById("location").innerHTML=
+`📍 Location Connected<br><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`;
+document.getElementById("liveLocation").innerHTML=
+`${lat.toFixed(6)}<br>${lng.toFixed(6)}<br>±${Math.round(pos.coords.accuracy)}m`;
+}
+
+function getLocation(){
+const box=document.getElementById("location"),live=document.getElementById("liveLocation");
+return new Promise((resolve)=>{
+if(!navigator.geolocation){
+box.innerHTML="❌ GPS unsupported";live.innerHTML="Unavailable";resolve(false);return;
+}
+box.innerHTML="📍 Fetching location...";
+navigator.geolocation.getCurrentPosition(
+(pos)=>{paintLocation(pos);resolve(true)},
+()=>{
+box.innerHTML="❌ Location Permission Required<br><br>Tap Refresh Location";
+live.innerHTML="Permission Required";
+alert("Please allow location access.");
+resolve(false);
+},
+{enableHighAccuracy:true,timeout:15000,maximumAge:0}
+);
+});
+}
+
+/* LIVE TRACKING */
+let watchId=null,wakeLock=null,timerId=null;
+let trackStart=0,trackDist=0,prev=null,lastMapPos=null,lastMapTime=0;
+
+function haversine(a,b,c,d){
+const R=6371000,r=x=>x*Math.PI/180;
+const dLat=r(c-a),dLng=r(d-b);
+const h=Math.sin(dLat/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dLng/2)**2;
+return 2*R*Math.asin(Math.sqrt(h));
+}
+
+function setTrackUI(on){
+const s=document.getElementById("trackStatus"),b=document.getElementById("trackBtn");
+s.classList.toggle("track-on",on);
+document.getElementById("trackStatusText").textContent=on?"Tracking live":"Tracking off";
+b.textContent=on?"Stop Live Tracking":"Start Live Tracking";
+b.classList.toggle("green-btn",!on);
+b.classList.toggle("danger-btn",on);
+}
+
+function updateMap(force){
+if(lat===null)return;
+const now=Date.now();
+const moved=lastMapPos?haversine(lastMapPos[0],lastMapPos[1],lat,lng):Infinity;
+if(!force&&(now-lastMapTime<10000||moved<10))return;
+lastMapPos=[lat,lng];lastMapTime=now;
+document.getElementById("mapWrap").innerHTML=
+`<iframe loading="lazy" src="https://maps.google.com/maps?q=${lat},${lng}&z=17&output=embed"></iframe>`;
+}
+
+function onTrackPos(pos){
+const c=pos.coords;
+if(prev&&c.accuracy<=50){
+const d=haversine(prev.lat,prev.lng,c.latitude,c.longitude);
+if(d>=3)trackDist+=d;
+}
+if(c.accuracy<=50||!prev)prev={lat:c.latitude,lng:c.longitude};
+paintLocation(pos);
+const kmh=c.speed!=null&&!isNaN(c.speed)?c.speed*3.6:0;
+document.getElementById("tSpeed").textContent=kmh.toFixed(1);
+document.getElementById("tDist").textContent=(trackDist/1000).toFixed(2);
+document.getElementById("tAcc").textContent=Math.round(c.accuracy);
+document.getElementById("tUpdated").textContent="Last update: "+new Date().toLocaleTimeString();
+updateMap(false);
+}
+
+function onTrackErr(){
+document.getElementById("trackStatusText").textContent="Location unavailable - check permission";
+}
+
+function tickTimer(){
+const s=Math.floor((Date.now()-trackStart)/1000);
+const h=Math.floor(s/3600),m=String(Math.floor(s%3600/60)).padStart(2,"0"),sec=String(s%60).padStart(2,"0");
+document.getElementById("tTime").textContent=(h?h+":":"")+m+":"+sec;
+}
+
+async function keepAwake(){
+try{if("wakeLock"in navigator)wakeLock=await navigator.wakeLock.request("screen")}catch{}
+}
+
+function startTracking(){
+if(watchId!==null)return true;
+if(!navigator.geolocation){alert("GPS unsupported on this device.");return false}
+trackStart=Date.now();trackDist=0;prev=null;lastMapPos=null;
+watchId=navigator.geolocation.watchPosition(onTrackPos,onTrackErr,
+{enableHighAccuracy:true,timeout:20000,maximumAge:0});
+timerId=setInterval(tickTimer,1000);
+keepAwake();
+setTrackUI(true);
+write("tracking",true);
+return true;
+}
+
+function stopTracking(){
+if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+watchId=null;
+clearInterval(timerId);timerId=null;
+try{if(wakeLock)wakeLock.release()}catch{}
+wakeLock=null;
+setTrackUI(false);
+write("tracking",false);
+}
+
+function toggleTracking(){
+watchId===null?startTracking():stopTracking();
+}
+
+function shareUpdate(){
+if(lat===null){alert("Waiting for location. Start tracking or refresh location first.");return}
+const contacts=read("contacts",[]);
+if(contacts.length===0){alert("Add contacts");return}
+const p=read("profile",{});
+const msg=`📍 LIVE LOCATION UPDATE\n\n👤 ${p.name||"User"}\n🕒 ${new Date().toLocaleTimeString()}\n📍 https://maps.google.com/?q=${lat},${lng}\n\nSent via SafeAlert`;
+window.location.href=`sms:${contacts.map(x=>x.phone).join(",")}?body=${encodeURIComponent(msg)}`;
+}
+
+/* re-acquire wake lock when returning to the page */
+document.addEventListener("visibilitychange",()=>{
+if(document.visibilityState==="visible"&&watchId!==null)keepAwake();
+});
+
+/* CONTACTS */
+function saveContact(){
+const n=document.getElementById("name"),p=document.getElementById("phone");
+if(!n.value.trim()||!p.value.trim()){alert("Enter details");return}
+const list=read("contacts",[]);
+list.push({name:n.value,phone:p.value});
+write("contacts",list);
+n.value="";p.value="";
+showContacts();showSafety();updateStats();
+}
+
+function deleteContact(i){
+const list=read("contacts",[]);
+list.splice(i,1);
+write("contacts",list);
+showContacts();showSafety();updateStats();
+}
+
+function showContacts(){
+const box=document.getElementById("contactList");
+box.innerHTML="";
+const data=read("contacts",[]);
+if(data.length===0){box.innerHTML=`<div class="card">No contacts</div>`;return}
+data.forEach((c,i)=>{
+box.innerHTML+=`<div class="contact">👤 ${c.name}<br><br>📞 ${c.phone}<br><br><button class="primary-btn" onclick="deleteContact(${i})">Delete</button></div>`;
+});
+}
+
+/* PROFILE */
+function saveProfile(){
+write("profile",{name:profileName.value,phone:profilePhone.value,email:profileEmail.value});
+showProfile();
+alert("Profile Saved");
+}
+
+function showProfile(){
+const p=read("profile",{});
+profileInfo.innerHTML=`👤 ${p.name||"-"}<br><br>📞 ${p.phone||"-"}<br><br>📧 ${p.email||"-"}`;
+}
+
+/* HISTORY */
+function showHistory(){
+const box=document.getElementById("historyList");
+box.innerHTML="";
+read("history",[]).slice().reverse().forEach(x=>{
+box.innerHTML+=`<div class="history">🚨 SOS Sent<br><br>${x.time}</div>`;
+});
+updateStats();
+}
+
+/* SOS */
+async function sendSOS(){
+const ok=await getLocation();
+if(!ok)return;
+const contacts=read("contacts",[]);
+if(contacts.length===0){alert("Add contacts");return}
+const profile=read("profile",{});
+const map=`https://maps.google.com/?q=${lat},${lng}`;
+const msg=`🚨 EMERGENCY ALERT\n\n👤 ${profile.name||"User"}\n\n📞 ${profile.phone||"-"}\n\n📍 ${map}\n\nSent via SafeAlert`;
+const history=read("history",[]);
+history.push({time:new Date().toLocaleString(),map});
+write("history",history);
+showHistory();
+
+/* start live tracking automatically after an SOS */
+startTracking();
+
+window.location.href=`sms:${contacts.map(x=>x.phone).join(",")}?body=${encodeURIComponent(msg)}`;
+}
+
+/* CALL */
+function callNumber(number){window.location.href=`tel:${number}`}
+
+function showSafety(){
+const box=document.getElementById("safetyContacts");
+box.innerHTML="";
+read("contacts",[]).forEach(c=>{
+box.innerHTML+=`<div class="contact">👤 ${c.name}<br><br><button class="primary-btn" onclick="callNumber('${c.phone}')">Call</button></div>`;
+});
+}
+
+/* SHAKE */
+window.addEventListener("devicemotion",(e)=>{
+const a=e.accelerationIncludingGravity;
+if(!a)return;
+const force=Math.abs(a.x||0)+Math.abs(a.y||0)+Math.abs(a.z||0);
+if(force<38)return;
+const now=Date.now();
+if(now-lastShake<5000)return;
+lastShake=now;
+sendSOS();
+});
+
+/* NAV */
+function tab(id,el){
+document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+document.getElementById(id).classList.add("active");
+document.querySelectorAll(".item").forEach(x=>x.classList.remove("selected"));
+el.classList.add("selected");
+if(id==="track"&&lat!==null&&watchId!==null)updateMap(true);
+}
+
+/* START */
+window.onload=async()=>{
+showContacts();showProfile();showHistory();showSafety();updateStats();
+await getLocation();
+if(read("tracking",false))startTracking();
+};
+</script>
+</body>
+  </html>
+  
